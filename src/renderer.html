@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>AutoApply Job App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f6f7f9; color: #111827; }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 28px; }
+    .card { background: white; border-radius: 16px; padding: 22px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 26px; }
+    textarea { width: 100%; height: 210px; padding: 12px; font-size: 14px; border-radius: 10px; border: 1px solid #d1d5db; box-sizing: border-box; }
+    button { padding: 12px 18px; border: none; border-radius: 10px; background: #111827; color: white; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .row { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+    .log { background: #0b1020; color: #e5e7eb; padding: 14px; height: 230px; overflow: auto; border-radius: 12px; white-space: pre-wrap; font-size: 13px; }
+    .small { color: #6b7280; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>AutoApply Job App</h1>
+      <p class="small">Paste one job link per line. Auto-submit is off by default so you can review before final submission.</p>
+      <textarea id="links" placeholder="https://company.wd5.myworkdayjobs.com/...&#10;https://boards.greenhouse.io/..."></textarea>
+      <div class="row">
+        <button id="start">Start Applying</button>
+        <label><input id="autoSubmit" type="checkbox" /> Auto-submit after filling</label>
+      </div>
+      <h3>Log</h3>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+  <script>
+    const startBtn = document.getElementById("start");
+    const logBox = document.getElementById("log");
+    function log(msg) {
+      logBox.textContent += msg + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    window.autoApply.onLog(log);
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      logBox.textContent = "";
+      log("Starting...");
+      const result = await window.autoApply.start({
+        links: document.getElementById("links").value,
+        autoSubmit: document.getElementById("autoSubmit").checked
+      });
+      log(JSON.stringify(result, null, 2));
+      startBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

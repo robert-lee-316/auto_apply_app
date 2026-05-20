@@ -1,0 +1,16 @@
+{
+  "name": "autoapply-job-app",
+  "version": "1.0.0",
+  "description": "Standalone job auto-apply app using Electron and Puppeteer.",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "apply:cli": "node src/cli.js"
+  },
+  "dependencies": {
+    "electron": "^31.7.7",
+    "puppeteer": "^23.11.1"
+  },
+  "devDependencies": {}
+}
