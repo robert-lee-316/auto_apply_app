@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "AutoApply — Workday & iCIMS",
+  "version": "1.1.0",
+  "description": "Fill Workday and iCIMS job applications from your saved profile. Side panel stays open next to the application.",
+  "permissions": ["storage", "activeTab", "sidePanel", "tabs"],
+  "host_permissions": [
+    "*://*.myworkdayjobs.com/*",
+    "*://*.workdayjobs.com/*",
+    "*://*.workday.com/*",
+    "*://*.icims.com/*"
+  ],
+  "action": {
+    "default_title": "Open AutoApply side panel"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.myworkdayjobs.com/*",
+        "*://*.workdayjobs.com/*",
+        "*://*.workday.com/*",
+        "*://*.icims.com/*"
+      ],
+      "js": [
+        "platforms/shared/dom.js",
+        "platforms/registry.js",
+        "platforms/workday/apply.js",
+        "platforms/workday/index.js",
+        "platforms/icims/apply.js",
+        "platforms/icims/index.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}

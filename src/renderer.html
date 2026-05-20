@@ -4,51 +4,290 @@
   <meta charset="UTF-8" />
   <title>AutoApply Job App</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f6f7f9; color: #111827; }
-    .wrap { max-width: 820px; margin: 0 auto; padding: 28px; }
-    .card { background: white; border-radius: 16px; padding: 22px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
-    h1 { margin-top: 0; font-size: 26px; }
-    textarea { width: 100%; height: 210px; padding: 12px; font-size: 14px; border-radius: 10px; border: 1px solid #d1d5db; box-sizing: border-box; }
-    button { padding: 12px 18px; border: none; border-radius: 10px; background: #111827; color: white; font-weight: 700; cursor: pointer; }
+    :root { --bg: #f3f4f6; --card: #fff; --text: #111827; --muted: #6b7280; --line: #e5e7eb; --accent: #111827; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .card { background: var(--card); border-radius: 16px; padding: 22px; box-shadow: 0 8px 24px rgba(0,0,0,.07); margin-bottom: 16px; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    h2 { margin: 0 0 14px; font-size: 17px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab { padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: white; cursor: pointer; font-weight: 600; }
+    .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+    input, textarea, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+    textarea { min-height: 88px; resize: vertical; }
+    .full { grid-column: 1 / -1; }
+    button { padding: 11px 16px; border: none; border-radius: 10px; background: var(--accent); color: white; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #e5e7eb; color: #111827; }
     button:disabled { opacity: .55; cursor: not-allowed; }
-    .row { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
-    .log { background: #0b1020; color: #e5e7eb; padding: 14px; height: 230px; overflow: auto; border-radius: 12px; white-space: pre-wrap; font-size: 13px; }
-    .small { color: #6b7280; font-size: 13px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    .log { background: #0b1020; color: #e5e7eb; padding: 14px; height: 200px; overflow: auto; border-radius: 12px; white-space: pre-wrap; font-size: 13px; }
+    .small { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .badge { display: inline-block; background: #eef2ff; color: #3730a3; padding: 4px 10px; border-radius: 999px; font-size: 12px; margin: 2px 4px 2px 0; }
+    .status { font-size: 13px; color: #059669; min-height: 18px; }
+    .work-block { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 10px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>AutoApply Job App</h1>
-      <p class="small">Paste one job link per line. Auto-submit is off by default so you can review before final submission.</p>
-      <textarea id="links" placeholder="https://company.wd5.myworkdayjobs.com/...&#10;https://boards.greenhouse.io/..."></textarea>
-      <div class="row">
-        <button id="start">Start Applying</button>
-        <label><input id="autoSubmit" type="checkbox" /> Auto-submit after filling</label>
+      <p class="small">
+        Fill your profile once, paste job links, and the app opens Chrome and fills guest applications.
+        <strong>Workday</strong> and <strong>iCIMS</strong> are skipped here — use your Chrome extension for those.
+        Sign-in and sign-up are never automated.
+      </p>
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="apply">Apply</button>
+        <button type="button" class="tab" data-tab="profile">Profile</button>
       </div>
-      <h3>Log</h3>
+    </div>
+
+    <div id="panel-apply" class="panel active card">
+      <h2>Job links</h2>
+      <p class="small">One URL per line. Supported in this app: Greenhouse, Lever, Ashby, UltiPro/UKG, Paylocity, Rippling, and similar guest-apply forms.</p>
+      <textarea id="links" placeholder="https://boards.greenhouse.io/company/jobs/123&#10;https://jobs.lever.co/company/abc&#10;https://jobs.ashbyhq.com/company/uuid"></textarea>
+      <div class="row">
+        <button type="button" id="start">Start applying</button>
+        <label class="small"><input id="autoSubmit" type="checkbox" /> Auto-submit after filling (off by default)</label>
+      </div>
+      <h2 style="margin-top:18px">Log</h2>
       <div id="log" class="log"></div>
     </div>
+
+    <div id="panel-profile" class="panel card">
+      <h2>Your profile</h2>
+      <p class="status" id="saveStatus"></p>
+
+      <div class="section-title">Contact</div>
+      <div class="grid">
+        <div><label>First name</label><input id="firstName" /></div>
+        <div><label>Last name</label><input id="lastName" /></div>
+        <div><label>Full name</label><input id="fullName" /></div>
+        <div><label>Suffix</label><input id="suffix" placeholder="Jr, III" /></div>
+        <div class="full"><label>Email</label><input id="email" type="email" /></div>
+        <div><label>Phone</label><input id="phoneNumber" /></div>
+        <div><label>Phone type</label><input id="phoneType" placeholder="Mobile" /></div>
+      </div>
+
+      <div class="section-title">Address</div>
+      <div class="grid">
+        <div class="full"><label>Street</label><input id="street" /></div>
+        <div><label>City</label><input id="city" /></div>
+        <div><label>State / region</label><input id="state" /></div>
+        <div><label>Postal code</label><input id="postalCode" /></div>
+        <div><label>Country</label><input id="country" /></div>
+      </div>
+
+      <div class="section-title">Links & resume</div>
+      <div class="grid">
+        <div class="full"><label>LinkedIn</label><input id="linkedInLink" /></div>
+        <div><label>GitHub</label><input id="githubLink" /></div>
+        <div><label>Portfolio</label><input id="portfolioLink" /></div>
+        <div class="full">
+          <label>Resume file</label>
+          <div class="row">
+            <input id="resumeFilePath" readonly style="flex:1" />
+            <button type="button" class="secondary" id="pickResume">Choose file</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Education</div>
+      <div class="grid grid-3">
+        <div class="full"><label>School</label><input id="school" /></div>
+        <div><label>Degree</label><input id="degree" /></div>
+        <div><label>Field of study</label><input id="fieldOfStudy" /></div>
+        <div><label>GPA</label><input id="gpa" /></div>
+        <div><label>Start year</label><input id="educationStartYear" /></div>
+        <div><label>End year</label><input id="educationEndYear" /></div>
+      </div>
+
+      <div class="section-title">Work authorization</div>
+      <div class="grid">
+        <div><label>Authorized to work?</label><input id="workAuthorization" placeholder="Yes" /></div>
+        <div><label>Sponsorship required?</label><input id="sponsorshipRequired" placeholder="No" /></div>
+      </div>
+
+      <div class="section-title">Skills</div>
+      <div class="grid">
+        <div class="full"><label>Comma-separated</label><input id="skills" placeholder="Python, SQL, React" /></div>
+      </div>
+
+      <div class="section-title">Work experience</div>
+      <div id="workList"></div>
+      <button type="button" class="secondary" id="addWork">+ Add job</button>
+
+      <div class="section-title">Optional (EEO)</div>
+      <div class="grid grid-3">
+        <div><label>Gender</label><input id="gender" /></div>
+        <div><label>Ethnicity</label><input id="ethnicity" /></div>
+        <div><label>Hispanic or Latino</label><input id="hispanicOrLatino" /></div>
+        <div><label>Veteran status</label><input id="veteranStatus" /></div>
+        <div><label>Disability</label><input id="disability" /></div>
+      </div>
+
+      <div class="row" style="margin-top:20px">
+        <button type="button" id="saveProfile">Save profile</button>
+      </div>
+      <p class="small" style="margin-top:12px">
+        Profile is saved to your app data folder. Platforms supported here:
+        <span class="badge">Greenhouse</span><span class="badge">Lever</span><span class="badge">Ashby</span>
+        <span class="badge">UltiPro</span><span class="badge">Paylocity</span><span class="badge">Rippling</span>
+        <span class="badge">Generic</span>
+      </p>
+    </div>
   </div>
+
   <script>
-    const startBtn = document.getElementById("start");
-    const logBox = document.getElementById("log");
+    const $ = (id) => document.getElementById(id);
+    const panels = { apply: $("panel-apply"), profile: $("panel-profile") };
+    let profile = {};
+    let workexperiences = [];
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        Object.values(panels).forEach((p) => p.classList.remove("active"));
+        panels[tab.dataset.tab].classList.add("active");
+      });
+    });
+
     function log(msg) {
-      logBox.textContent += msg + "\n";
-      logBox.scrollTop = logBox.scrollHeight;
+      const box = $("log");
+      box.textContent += msg + "\n";
+      box.scrollTop = box.scrollHeight;
     }
     window.autoApply.onLog(log);
-    startBtn.addEventListener("click", async () => {
-      startBtn.disabled = true;
-      logBox.textContent = "";
-      log("Starting...");
+
+    function renderWork() {
+      const root = $("workList");
+      root.innerHTML = "";
+      workexperiences.forEach((w, i) => {
+        const block = document.createElement("div");
+        block.className = "work-block";
+        block.innerHTML = `
+          <div class="grid">
+            <div><label>Job title</label><input data-i="${i}" data-f="jobtitle" value="${esc(w.jobtitle)}" /></div>
+            <div><label>Company</label><input data-i="${i}" data-f="company" value="${esc(w.company)}" /></div>
+            <div class="full"><label>Location</label><input data-i="${i}" data-f="location" value="${esc(w.location)}" /></div>
+            <div><label>Start month</label><input data-i="${i}" data-f="startDateMonth" value="${esc(w.startDateMonth)}" /></div>
+            <div><label>Start year</label><input data-i="${i}" data-f="startDateYear" value="${esc(w.startDateYear)}" /></div>
+            <div><label>End month</label><input data-i="${i}" data-f="endDateMonth" value="${esc(w.endDateMonth)}" /></div>
+            <div><label>End year</label><input data-i="${i}" data-f="endDateYear" value="${esc(w.endDateYear)}" /></div>
+            <div class="full"><label>Description</label><textarea data-i="${i}" data-f="description">${esc(w.description)}</textarea></div>
+          </div>
+          <button type="button" class="secondary remove-work" data-i="${i}">Remove</button>
+        `;
+        root.appendChild(block);
+      });
+      root.querySelectorAll("input, textarea").forEach((el) => {
+        el.addEventListener("input", () => {
+          const i = +el.dataset.i;
+          workexperiences[i][el.dataset.f] = el.value;
+        });
+      });
+      root.querySelectorAll(".remove-work").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          workexperiences.splice(+btn.dataset.i, 1);
+          renderWork();
+        });
+      });
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+    }
+
+    function fillForm(p) {
+      const map = [
+        "firstName","lastName","fullName","suffix","email","phoneNumber","phoneType",
+        "street","city","state","postalCode","country",
+        "linkedInLink","githubLink","portfolioLink","resumeFilePath",
+        "school","degree","fieldOfStudy","gpa","educationStartYear","educationEndYear",
+        "workAuthorization","sponsorshipRequired",
+        "gender","ethnicity","hispanicOrLatino","veteranStatus","disability"
+      ];
+      map.forEach((k) => { if ($(k)) $(k).value = p[k] ?? ""; });
+      $("skills").value = Array.isArray(p.skills) ? p.skills.join(", ") : "";
+      workexperiences = Array.isArray(p.workexperiences) ? [...p.workexperiences] : [];
+      if (!workexperiences.length) {
+        workexperiences.push({
+          jobtitle: "", company: "", location: "",
+          startDateMonth: "", startDateYear: "",
+          endDateMonth: "", endDateYear: "", description: ""
+        });
+      }
+      renderWork();
+    }
+
+    function readForm() {
+      const p = { ...profile };
+      const map = [
+        "firstName","lastName","fullName","suffix","email","phoneNumber","phoneType",
+        "street","city","state","postalCode","country",
+        "linkedInLink","githubLink","portfolioLink","resumeFilePath",
+        "school","degree","fieldOfStudy","gpa","educationStartYear","educationEndYear",
+        "workAuthorization","sponsorshipRequired",
+        "gender","ethnicity","hispanicOrLatino","veteranStatus","disability"
+      ];
+      map.forEach((k) => { p[k] = $(k).value.trim(); });
+      p.skills = $("skills").value.split(",").map((s) => s.trim()).filter(Boolean);
+      p.workexperiences = workexperiences;
+      p.autoSubmit = $("autoSubmit").checked;
+      return p;
+    }
+
+    $("addWork").addEventListener("click", () => {
+      workexperiences.push({
+        jobtitle: "", company: "", location: "",
+        startDateMonth: "", startDateYear: "",
+        endDateMonth: "", endDateYear: "", description: ""
+      });
+      renderWork();
+    });
+
+    $("pickResume").addEventListener("click", async () => {
+      const r = await window.autoApply.pickResume();
+      if (r.ok) $("resumeFilePath").value = r.path;
+    });
+
+    $("saveProfile").addEventListener("click", async () => {
+      profile = readForm();
+      const r = await window.autoApply.saveProfile(profile);
+      $("saveStatus").textContent = r.ok ? "Profile saved." : "Save failed.";
+    });
+
+    $("start").addEventListener("click", async () => {
+      $("start").disabled = true;
+      $("log").textContent = "";
+      profile = readForm();
+      await window.autoApply.saveProfile(profile);
+      log("Profile saved. Starting queue...");
       const result = await window.autoApply.start({
-        links: document.getElementById("links").value,
-        autoSubmit: document.getElementById("autoSubmit").checked
+        links: $("links").value,
+        autoSubmit: $("autoSubmit").checked,
+        profile
       });
       log(JSON.stringify(result, null, 2));
-      startBtn.disabled = false;
+      $("start").disabled = false;
     });
+
+    (async () => {
+      const r = await window.autoApply.getProfile();
+      if (r.ok) {
+        profile = r.profile;
+        fillForm(profile);
+        $("autoSubmit").checked = Boolean(profile.autoSubmit);
+      }
+    })();
   </script>
 </body>
 </html>

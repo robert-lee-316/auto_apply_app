@@ -1,6 +1,7 @@
 export const profile = {
   email: "email@email.com",
-  password: "ChangeMe123!",
+  /** Not used by desktop app (no sign-in automation). Kept for Chrome extension / legacy. */
+  password: "",
   fullName: "Hire Me Jr",
   firstName: "Hire",
   lastName: "Me",

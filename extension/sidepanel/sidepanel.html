@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AutoApply</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <div class="top-bar-inner">
+      <div>
+        <h1>AutoApply</h1>
+        <p id="pageStatus" class="status"></p>
+      </div>
+      <button type="button" id="applyBtn" class="primary">Fill application</button>
+    </div>
+    <label class="check"><input type="checkbox" id="autoSubmit" /> Auto-submit (off by default)</label>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button type="button" class="tab active" data-view="profile" role="tab">Profile</button>
+    <button type="button" class="tab" data-view="log" role="tab">Log</button>
+  </nav>
+
+  <main id="view-profile" class="view active">
+    <div class="profile-scroll">
+    <form id="profileForm">
+      <p class="hint">Review your profile below, then save at the bottom before filling the application.</p>
+
+      <h3 class="section-title">Contact</h3>
+      <div class="grid">
+        <label>First name<input name="firstName" autocomplete="given-name" /></label>
+        <label>Last name<input name="lastName" autocomplete="family-name" /></label>
+        <label class="span2">Full name<input name="fullName" autocomplete="name" /></label>
+        <label class="span2">Email<input name="email" type="email" autocomplete="email" /></label>
+        <label>Phone<input name="phoneNumber" autocomplete="tel" /></label>
+      </div>
+
+      <h3 class="section-title">Address</h3>
+      <div class="grid">
+        <label class="span2">Street<input name="street" autocomplete="street-address" /></label>
+        <label>City<input name="city" autocomplete="address-level2" /></label>
+        <label>State<input name="state" autocomplete="address-level1" /></label>
+        <label>Postal<input name="postalCode" autocomplete="postal-code" /></label>
+      </div>
+
+      <h3 class="section-title">Links</h3>
+      <div class="grid">
+        <label class="span2">LinkedIn<input name="linkedInLink" /></label>
+        <label>GitHub<input name="githubLink" /></label>
+      </div>
+
+      <h3 class="section-title">Education</h3>
+      <div class="grid">
+        <label class="span2">School<input name="school" /></label>
+        <label>Degree<input name="degree" /></label>
+        <label>Major<input name="fieldOfStudy" /></label>
+        <label>GPA<input name="gpa" /></label>
+        <label>Start year<input name="educationStartYear" /></label>
+        <label>End year<input name="educationEndYear" /></label>
+      </div>
+
+      <h3 class="section-title">Work experience</h3>
+      <div id="workList"></div>
+      <button type="button" id="addWork" class="secondary add-work-btn">+ Add job</button>
+
+      <h3 class="section-title">Other</h3>
+      <div class="grid">
+        <label>Work auth<input name="workAuthorization" placeholder="Yes" /></label>
+        <label>Sponsorship<input name="sponsorshipRequired" placeholder="No" /></label>
+        <label class="span2">Skills (comma-separated)<input name="skillsText" /></label>
+      </div>
+
+      <h3 class="section-title">Resume</h3>
+      <label class="resume-row">
+        <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" />
+        <span id="resumeName" class="muted">No file chosen</span>
+      </label>
+
+    </form>
+    </div>
+    <footer class="save-footer">
+      <button type="button" id="saveBtn" class="primary save-btn">Save profile</button>
+    </footer>
+  </main>
+
+  <main id="view-log" class="view">
+    <div class="log-wrap">
+      <div class="log-toolbar">
+        <button type="button" id="clearLog" class="secondary">Clear</button>
+      </div>
+      <pre id="log" class="log"></pre>
+    </div>
+  </main>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,7 +1,6 @@
 import puppeteer from "puppeteer";
 import { profile as defaultProfile } from "./profile.js";
-import { isWorkday, applyWorkday } from "./workday.js";
-import { applyGeneric } from "./generic.js";
+import { applyForPlatform, detectPlatform, platformLabel, EXTENSION_PLATFORMS } from "./platforms/index.js";
 
 export async function runQueue(jobLinks, options = {}) {
   const profile = { ...defaultProfile, ...(options.profile || {}) };
@@ -17,23 +16,38 @@ export async function runQueue(jobLinks, options = {}) {
   const results = [];
 
   for (const url of jobLinks.filter(Boolean)) {
+    const platform = detectPlatform(url);
     const page = await browser.newPage();
+
     try {
       log(`Opening: ${url}`);
+      log(`Detected: ${platformLabel(platform)}`);
+
+      if (EXTENSION_PLATFORMS.includes(platform)) {
+        log(`Skipped — use your Chrome extension for ${platformLabel(platform)} applications.`);
+        results.push({
+          url,
+          platform,
+          status: "skipped",
+          message: `Use Chrome extension for ${platformLabel(platform)}`
+        });
+        await page.close();
+        continue;
+      }
+
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
       await page.bringToFront();
 
-      const result = isWorkday(url)
-        ? await applyWorkday(page, profile, log)
-        : await applyGeneric(page, profile, log);
-
+      const result = await applyForPlatform(page, url, profile, log);
       results.push({ url, ...result });
     } catch (error) {
       log(`Error: ${error.message}`);
-      results.push({ url, status: "error", error: error.message });
+      results.push({ url, platform, status: "error", error: error.message });
+    } finally {
+      await page.close().catch(() => {});
     }
   }
 
-  log("Queue finished.");
+  log("Queue finished. Review each tab before submitting.");
   return results;
 }
