@@ -1,9 +1,114 @@
 /* global AutoApplyDom */
 const WorkdayApply = (() => {
-  const { sleep, fillAny, fillFirst, clickAny, exists, chooseDropdown, fillByTextAny, uploadResumeFromProfile } =
-    AutoApplyDom;
+  const {
+    sleep,
+    fillAny,
+    fillFirst,
+    clickAny,
+    exists,
+    chooseDropdown,
+    choosePromptSearch,
+    chooseRadio,
+    fillByTextAny,
+    uploadResumeFromProfile
+  } = AutoApplyDom;
 
   const NEXT = 'button[data-automation-id="bottom-navigation-next-button"]';
+
+  const PHONE_TYPE_BUTTONS = [
+    "#phoneNumber--phoneType",
+    'button[name="phoneType"]',
+    '[data-automation-id="formField-phoneType"] button[aria-haspopup="listbox"]',
+    'button[data-automation-id="phone-device-type"]'
+  ];
+
+  const STATE_BUTTONS = [
+    "#address--countryRegion",
+    'button[name="countryRegion"]',
+    '[data-automation-id="formField-countryRegion"] button[aria-haspopup="listbox"]',
+    'button[data-automation-id="addressSection_countryRegion"]'
+  ];
+
+  const US_STATE_NAMES = {
+    AL: "Alabama",
+    AK: "Alaska",
+    AZ: "Arizona",
+    AR: "Arkansas",
+    CA: "California",
+    CO: "Colorado",
+    CT: "Connecticut",
+    DE: "Delaware",
+    FL: "Florida",
+    GA: "Georgia",
+    HI: "Hawaii",
+    ID: "Idaho",
+    IL: "Illinois",
+    IN: "Indiana",
+    IA: "Iowa",
+    KS: "Kansas",
+    KY: "Kentucky",
+    LA: "Louisiana",
+    ME: "Maine",
+    MD: "Maryland",
+    MA: "Massachusetts",
+    MI: "Michigan",
+    MN: "Minnesota",
+    MS: "Mississippi",
+    MO: "Missouri",
+    MT: "Montana",
+    NE: "Nebraska",
+    NV: "Nevada",
+    NH: "New Hampshire",
+    NJ: "New Jersey",
+    NM: "New Mexico",
+    NY: "New York",
+    NC: "North Carolina",
+    ND: "North Dakota",
+    OH: "Ohio",
+    OK: "Oklahoma",
+    OR: "Oregon",
+    PA: "Pennsylvania",
+    RI: "Rhode Island",
+    SC: "South Carolina",
+    SD: "South Dakota",
+    TN: "Tennessee",
+    TX: "Texas",
+    UT: "Utah",
+    VT: "Vermont",
+    VA: "Virginia",
+    WA: "Washington",
+    WV: "West Virginia",
+    WI: "Wisconsin",
+    WY: "Wyoming",
+    DC: "District of Columbia"
+  };
+
+  function phoneTypeValues(profile) {
+    const primary = (profile.phoneType || "Cell").trim();
+    const aliases = {
+      mobile: ["Mobile", "Cell", "Phone", "Cellular"],
+      cell: ["Cell", "Mobile", "Phone", "Cellular"],
+      phone: ["Phone", "Cell", "Landline"],
+      cellular: ["Cellular", "Cell", "Mobile"]
+    };
+    return [...new Set([primary, ...(aliases[primary.toLowerCase()] || [])])];
+  }
+
+  function stateValues(profile) {
+    const primary = (profile.state || "").trim();
+    if (!primary) return [];
+    const values = [primary];
+    if (primary.length === 2) {
+      const full = US_STATE_NAMES[primary.toUpperCase()];
+      if (full) values.unshift(full);
+    } else {
+      const abbr = Object.entries(US_STATE_NAMES).find(
+        ([, name]) => name.toLowerCase() === primary.toLowerCase()
+      )?.[0];
+      if (abbr) values.push(abbr);
+    }
+    return [...new Set(values)];
+  }
 
   async function startApplication(log) {
     if (exists('a[data-automation-id="adventureButton"]')) {
@@ -67,7 +172,7 @@ const WorkdayApply = (() => {
       profile.city
     );
 
-    chooseDropdown('button[data-automation-id="addressSection_countryRegion"]', profile.state);
+    await chooseDropdown(STATE_BUTTONS, stateValues(profile));
 
     fillFirst(
       [
@@ -79,7 +184,7 @@ const WorkdayApply = (() => {
       profile.postalCode
     );
 
-    chooseDropdown('button[data-automation-id="phone-device-type"]', profile.phoneType);
+    await chooseDropdown(PHONE_TYPE_BUTTONS, phoneTypeValues(profile));
 
     fillFirst(
       [
@@ -98,6 +203,16 @@ const WorkdayApply = (() => {
     fillByTextAny("city", profile.city);
     fillByTextAny(["postal code", "zip"], profile.postalCode);
     fillByTextAny(["phone number", "phone"], profile.phoneNumber);
+
+    await choosePromptSearch(
+      [
+        "#source--source",
+        '[data-automation-id="formField-source"] input[data-automation-id="searchBox"]',
+        '[data-automation-id="formField-source"] input[data-uxi-widget-type="selectinput"]'
+      ],
+      profile.applicationSource || "linkedin",
+      { labelKeywords: ["how did you hear", "hear about us"] }
+    );
   }
 
   async function fillExperience(profile) {
@@ -159,6 +274,18 @@ const WorkdayApply = (() => {
     }
   }
 
+  function fillPreviousWorker() {
+    chooseRadio({ name: "candidateIsPreviousWorker", value: "false" });
+    chooseRadio({
+      legendKeywords: ["previously been employed", "previous worker"],
+      labelText: "No"
+    });
+    clickAny('input[name="candidateIsPreviousWorker"][value="false"]');
+    clickAny(
+      '[data-automation-id="formField-candidateIsPreviousWorker"] input[type="radio"][value="false"]'
+    );
+  }
+
   async function fillDisclosures(profile) {
     chooseDropdown('button[data-automation-id="gender"]', profile.gender);
     chooseDropdown('button[data-automation-id="hispanicOrLatino"]', profile.hispanicOrLatino);
@@ -171,6 +298,7 @@ const WorkdayApply = (() => {
   }
 
   async function fillCurrentPage(profile) {
+    fillPreviousWorker();
     await fillContact(profile);
     await fillExperience(profile);
     await fillEducation(profile);

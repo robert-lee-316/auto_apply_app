@@ -26,7 +26,7 @@ const AutoApplyDom = (() => {
     return out;
   }
 
-  function setNativeValue(el, value) {
+  function setNativeValue(el, value, { blur = true } = {}) {
     const str = String(value);
     const proto = Object.getPrototypeOf(el);
     const desc = Object.getOwnPropertyDescriptor(proto, "value");
@@ -38,7 +38,98 @@ const AutoApplyDom = (() => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     }
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new Event("blur", { bubbles: true }));
+    if (blur) el.dispatchEvent(new Event("blur", { bubbles: true }));
+  }
+
+  function pressKey(el, key) {
+    const keyCode = key === "Enter" ? 13 : key === "ArrowDown" ? 40 : 0;
+    const init = { key, code: key, keyCode, bubbles: true, cancelable: true };
+    el.dispatchEvent(new KeyboardEvent("keydown", init));
+    if (key === "Enter") {
+      el.dispatchEvent(new KeyboardEvent("keypress", { ...init, charCode: 13 }));
+    }
+    el.dispatchEvent(new KeyboardEvent("keyup", init));
+  }
+
+  function promptIsFilled(container) {
+    const selected = (container?.querySelector('[data-automation-id="promptSelectionLabel"]')?.innerText || "").trim();
+    if (selected) return true;
+    const hint = (container?.querySelector('[data-automation-id="promptAriaInstruction"]')?.innerText || "").toLowerCase();
+    return hint.length > 0 && !hint.includes("0 items selected") && hint !== "minimized";
+  }
+
+  function findVisiblePromptOptions() {
+    const selectors = ['[role="listbox"] [role="option"]', '[data-automation-id="promptOption"]', '[role="option"]'];
+    for (const root of getRoots()) {
+      for (const sel of selectors) {
+        const options = [...root.querySelectorAll(sel)].filter((el) => {
+          const text = (el.innerText || el.textContent || "").trim();
+          if (!text) return false;
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        });
+        if (options.length) return options;
+      }
+    }
+    return [];
+  }
+
+  async function choosePromptSearch(selectors, searchText, { labelKeywords } = {}) {
+    const selList = Array.isArray(selectors) ? selectors : [selectors];
+    const query = String(searchText || "").trim();
+    if (!query) return false;
+    const labelList = labelKeywords
+      ? Array.isArray(labelKeywords)
+        ? labelKeywords
+        : [labelKeywords]
+      : [];
+
+    for (const root of getRoots()) {
+      let input = null;
+      for (const sel of selList) {
+        input = root.querySelector(sel);
+        if (input) break;
+      }
+      if (!input && labelList.length) {
+        for (const label of root.querySelectorAll("label")) {
+          const text = (label.innerText || "").toLowerCase();
+          if (!labelList.some((k) => text.includes(String(k).toLowerCase()))) continue;
+          const forId = label.getAttribute("for");
+          if (!forId) continue;
+          input = root.querySelector(`#${CSS.escape(forId)}`);
+          if (input) break;
+        }
+      }
+      if (!input) continue;
+
+      const container = input.closest('[data-automation-id="multiSelectContainer"]');
+      if (promptIsFilled(container)) return true;
+
+      const expandBtn =
+        container?.querySelector('[data-automation-id="promptSearchButton"]') ||
+        container?.querySelector('[data-automation-id="promptIcon"]');
+      expandBtn?.click();
+      await sleep(300);
+
+      input.focus();
+      input.click();
+      await sleep(150);
+      setNativeValue(input, query, { blur: false });
+      await sleep(700);
+      pressKey(input, "ArrowDown");
+      await sleep(150);
+      pressKey(input, "Enter");
+      await sleep(400);
+
+      if (promptIsFilled(container)) return true;
+      const option = findVisiblePromptOptions()[0];
+      if (option) {
+        option.click();
+        await sleep(300);
+        if (promptIsFilled(container)) return true;
+      }
+    }
+    return false;
   }
 
   function fill(selector, value, root = document) {
@@ -85,29 +176,123 @@ const AutoApplyDom = (() => {
     return queryInAllRoots(selector).length > 0;
   }
 
-  async function chooseDropdown(selector, value) {
-    if (!value) return false;
-    for (const root of getRoots()) {
-      const btn = root.querySelector(selector);
-      if (!btn) continue;
-      btn.click();
-      await sleep(350);
-      const search = root.activeElement;
-      if (search && (search.tagName === "INPUT" || search.getAttribute("role") === "combobox")) {
-        setNativeValue(search, String(value));
-        search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  function chooseRadio({ name, value, labelText, legendKeywords } = {}) {
+    const legendList = legendKeywords
+      ? Array.isArray(legendKeywords)
+        ? legendKeywords
+        : [legendKeywords]
+      : [];
+
+    function clickRadio(root, input) {
+      if (!input) return false;
+      if (!input.checked) {
+        input.click();
+        if (input.id) root.querySelector(`label[for="${CSS.escape(input.id)}"]`)?.click();
       }
-      await sleep(200);
-      const option = [...root.querySelectorAll('[role="option"], li, [data-automation-id*="option"]')].find(
-        (o) => (o.innerText || "").toLowerCase().includes(String(value).toLowerCase())
-      );
-      if (option) {
-        option.click();
-        return true;
-      }
-      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      await sleep(250);
       return true;
+    }
+
+    function findByLabel(root, radios, text) {
+      const want = String(text).toLowerCase();
+      return radios.find((r) => {
+        if (!r.id) return false;
+        const lbl = root.querySelector(`label[for="${CSS.escape(r.id)}"]`);
+        const t = (lbl?.innerText || "").trim().toLowerCase();
+        return t === want;
+      });
+    }
+
+    for (const root of getRoots()) {
+      if (name) {
+        const radios = [...root.querySelectorAll(`input[type="radio"][name="${name}"]`)];
+        const target =
+          value !== undefined
+            ? radios.find((r) => r.value === String(value))
+            : labelText
+              ? findByLabel(root, radios, labelText)
+              : null;
+        if (clickRadio(root, target)) return true;
+      }
+
+      if (legendList.length && labelText) {
+        for (const legend of root.querySelectorAll("legend label, legend")) {
+          const text = (legend.innerText || "").toLowerCase();
+          if (!legendList.some((k) => text.includes(String(k).toLowerCase()))) continue;
+          const group = legend.closest("fieldset, [role='group']");
+          if (!group) continue;
+          const target = findByLabel(root, [...group.querySelectorAll('input[type="radio"]')], labelText);
+          if (clickRadio(root, target)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function dropdownShowsValue(btn, value) {
+    const current = (btn.innerText || btn.textContent || btn.getAttribute("aria-label") || "").toLowerCase();
+    const want = String(value).toLowerCase();
+    return current.includes(want);
+  }
+
+  function findListOption(root, value) {
+    return [...root.querySelectorAll('[role="option"], li, [data-automation-id*="option"]')].find((o) => {
+      const text = (o.innerText || o.textContent || "").trim().toLowerCase();
+      const want = String(value).toLowerCase();
+      return text === want || text.startsWith(`${want} `) || text.includes(want);
+    });
+  }
+
+  function findListOptionAnywhere(value) {
+    for (const root of getRoots()) {
+      const option = findListOption(root, value);
+      if (option) return option;
+    }
+    return null;
+  }
+
+  function findDropdownSearchInput() {
+    for (const root of getRoots()) {
+      if (root.activeElement?.tagName === "INPUT") return root.activeElement;
+      const search = root.querySelector(
+        '[role="listbox"] input, [data-automation-id="searchBox"], input[placeholder*="Search" i]'
+      );
+      if (search) return search;
+    }
+    return null;
+  }
+
+  async function chooseDropdown(selector, value) {
+    const selectors = Array.isArray(selector) ? selector : [selector];
+    const values = (Array.isArray(value) ? value : [value]).filter(
+      (v) => v !== undefined && v !== null && v !== ""
+    );
+    if (!values.length) return false;
+
+    for (const root of getRoots()) {
+      for (const sel of selectors) {
+        const btn = root.querySelector(sel);
+        if (!btn) continue;
+
+        if (values.some((v) => dropdownShowsValue(btn, v))) return true;
+
+        for (const pick of values) {
+          btn.click();
+          await sleep(350);
+          const search = findDropdownSearchInput();
+          if (search && (search.tagName === "INPUT" || search.getAttribute("role") === "combobox")) {
+            setNativeValue(search, String(pick), { blur: false });
+            await sleep(400);
+            search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+          }
+          await sleep(200);
+          const option = findListOptionAnywhere(pick);
+          if (option) {
+            option.click();
+            await sleep(200);
+            if (dropdownShowsValue(btn, pick)) return true;
+          }
+        }
+      }
     }
     return false;
   }
@@ -118,6 +303,7 @@ const AutoApplyDom = (() => {
     const fields = [...root.querySelectorAll("input, textarea, select")];
     for (const field of fields) {
       if (field.type === "hidden" || field.disabled) continue;
+      if (field.closest('[aria-labelledby="previousWorker-section"], [data-fkit-id^="previousWorker"]')) continue;
       const id = field.id ? `label[for="${field.id.replace(/"/g, '\\"')}"]` : null;
       const label = id ? root.querySelector(id)?.innerText || "" : "";
       const text = [
@@ -203,6 +389,8 @@ const AutoApplyDom = (() => {
     clickAny,
     exists,
     chooseDropdown,
+    chooseRadio,
+    choosePromptSearch,
     fillByText,
     fillByTextAny,
     uploadResumeFromProfile,
