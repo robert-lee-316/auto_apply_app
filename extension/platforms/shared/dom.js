@@ -132,6 +132,61 @@ const AutoApplyDom = (() => {
     return false;
   }
 
+  async function typeIntoField(el, value) {
+    const str = String(value);
+    el.focus();
+    el.click();
+    await sleep(80);
+
+    try {
+      el.select();
+      document.execCommand("selectAll", false, null);
+      document.execCommand("delete", false, null);
+      document.execCommand("insertText", false, str);
+    } catch {
+      /* execCommand unavailable */
+    }
+
+    if ((el.value || "") !== str) {
+      setNativeValue(el, str, { blur: false });
+    }
+
+    if ((el.value || "") !== str) {
+      setNativeValue(el, "", { blur: false });
+      for (const ch of str) {
+        setNativeValue(el, el.value + ch, { blur: false });
+        el.dispatchEvent(
+          new InputEvent("input", { bubbles: true, cancelable: true, inputType: "insertText", data: ch })
+        );
+        await sleep(20);
+      }
+    }
+
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+    await sleep(120);
+    return Boolean((el.value || "").trim());
+  }
+
+  async function fillInput(selectors, value) {
+    const list = Array.isArray(selectors) ? selectors : [selectors];
+    const values = (Array.isArray(value) ? value : [value]).filter(
+      (v) => v !== undefined && v !== null && String(v).trim() !== ""
+    );
+    if (!values.length) return false;
+
+    for (const root of getRoots()) {
+      for (const sel of list) {
+        const el = root.querySelector(sel);
+        if (!el) continue;
+        for (const v of values) {
+          if (await typeIntoField(el, v)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function fill(selector, value, root = document) {
     if (value === undefined || value === null || value === "") return false;
     const el = root.querySelector(selector);
@@ -168,6 +223,18 @@ const AutoApplyDom = (() => {
   function clickAny(selector) {
     for (const root of getRoots()) {
       if (click(selector, root)) return true;
+    }
+    return false;
+  }
+
+  function checkAny(selector) {
+    for (const root of getRoots()) {
+      const el = root.querySelector(selector);
+      if (!el) continue;
+      if (el.checked) return true;
+      el.click();
+      if (el.id) root.querySelector(`label[for="${CSS.escape(el.id)}"]`)?.click();
+      return Boolean(el.checked);
     }
     return false;
   }
@@ -304,6 +371,8 @@ const AutoApplyDom = (() => {
     for (const field of fields) {
       if (field.type === "hidden" || field.disabled) continue;
       if (field.closest('[aria-labelledby="previousWorker-section"], [data-fkit-id^="previousWorker"]')) continue;
+      if (field.getAttribute("data-uxi-widget-type") === "selectinput") continue;
+      if (/countryPhoneCode|phoneType/i.test(field.id || field.name || "")) continue;
       const id = field.id ? `label[for="${field.id.replace(/"/g, '\\"')}"]` : null;
       const label = id ? root.querySelector(id)?.innerText || "" : "";
       const text = [
@@ -383,10 +452,12 @@ const AutoApplyDom = (() => {
   return {
     sleep,
     fill,
+    fillInput,
     fillAny,
     fillFirst,
     click,
     clickAny,
+    checkAny,
     exists,
     chooseDropdown,
     chooseRadio,

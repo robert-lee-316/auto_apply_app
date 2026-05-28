@@ -9,9 +9,30 @@ const WorkdayApply = (() => {
     chooseDropdown,
     choosePromptSearch,
     chooseRadio,
+    fillInput,
     fillByTextAny,
+    checkAny,
     uploadResumeFromProfile
   } = AutoApplyDom;
+
+  const PHONE_NUMBER_INPUT = [
+    "#phoneNumber--phoneNumber",
+    'input#phoneNumber--phoneNumber[name="phoneNumber"]',
+    '[data-automation-id="formField-phoneNumber"] input[type="text"][name="phoneNumber"]'
+  ];
+
+  function phoneNumberValues(profile) {
+    const raw = (profile.phoneNumber || "").trim();
+    if (!raw) return [];
+    const digits = raw.replace(/\D/g, "");
+    return [...new Set([raw, digits].filter(Boolean))];
+  }
+
+  async function fillPhoneNumber(profile) {
+    const values = phoneNumberValues(profile);
+    if (!values.length) return false;
+    return fillInput(PHONE_NUMBER_INPUT, values);
+  }
 
   const NEXT = 'button[data-automation-id="bottom-navigation-next-button"]';
 
@@ -184,17 +205,19 @@ const WorkdayApply = (() => {
       profile.postalCode
     );
 
+    await choosePromptSearch(
+      [
+        "#phoneNumber--countryPhoneCode",
+        '[data-automation-id="formField-countryPhoneCode"] input[data-uxi-widget-type="selectinput"]'
+      ],
+      ["United states", "United States", "USA", profile.country].filter(Boolean),
+      { labelKeywords: ["country / territory phone code", "phone code"] }
+    );
+
     await chooseDropdown(PHONE_TYPE_BUTTONS, phoneTypeValues(profile));
 
-    fillFirst(
-      [
-        "#phoneNumber--phoneNumber",
-        'input[name="phoneNumber"]',
-        '[data-automation-id="formField-phoneNumber"] input',
-        'input[data-automation-id="phone-number"]'
-      ],
-      profile.phoneNumber
-    );
+    await fillPhoneNumber(profile);
+    checkAny('input[data-automation-id="phone-sms-opt-in"]');
 
     fillByTextAny(["first name", "given name"], profile.firstName);
     fillByTextAny(["last name", "family name"], profile.lastName);
@@ -202,7 +225,6 @@ const WorkdayApply = (() => {
     fillByTextAny(["address line 1", "street"], profile.street);
     fillByTextAny("city", profile.city);
     fillByTextAny(["postal code", "zip"], profile.postalCode);
-    fillByTextAny(["phone number", "phone"], profile.phoneNumber);
 
     await choosePromptSearch(
       [
@@ -213,6 +235,9 @@ const WorkdayApply = (() => {
       profile.applicationSource || "linkedin",
       { labelKeywords: ["how did you hear", "hear about us"] }
     );
+
+    await fillPhoneNumber(profile);
+    checkAny('input[data-automation-id="phone-sms-opt-in"]');
   }
 
   async function fillExperience(profile) {
